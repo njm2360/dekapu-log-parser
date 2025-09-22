@@ -14,12 +14,14 @@ from influxdb_client.rest import ApiException
 from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
 
 
-load_dotenv()
+load_dotenv(override=True)
 
-INFLUX_URL = os.getenv("INFLUX_URL")
-INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
-ORG = os.getenv("INFLUX_ORG")
-BUCKET = os.getenv("INFLUX_BUCKET")
+INFLUXDB_URL = os.getenv("INFLUXDB_URL")
+INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
+INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
+INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
+
+VRCHAT_LOG_DIR = Path(os.getenv("VRCHAT_LOG_DIR", "/app/vrchat_log"))
 
 
 # ログ設定
@@ -63,7 +65,7 @@ class InfluxWriterAsync:
 class VRChatLogWatcher:
     def __init__(self, influx: InfluxWriterAsync):
         self.influx = influx
-        self.vrchat_log_dir = Path.home() / "AppData" / "LocalLow" / "VRChat" / "VRChat"
+        self.vrchat_log_dir = VRCHAT_LOG_DIR
         self.credit_history: Deque[Tuple[datetime, int]] = deque()
 
     def get_latest_log(self) -> Path:
@@ -163,7 +165,7 @@ class VRChatLogWatcher:
 
             if delta is not None:
                 p = p.field("credit_all_delta_1m", delta)
-                logging.info(delta)
+                logging.info(f"獲得速度: {delta} 枚/min")
 
             await self.influx.write(p)
             logging.info(f"Data write success (user={user_id})")
@@ -173,7 +175,9 @@ class VRChatLogWatcher:
 
 
 async def main():
-    influx = InfluxWriterAsync(INFLUX_URL, INFLUX_TOKEN, ORG, BUCKET)
+    influx = InfluxWriterAsync(
+        INFLUXDB_URL, INFLUXDB_TOKEN, INFLUXDB_ORG, INFLUXDB_BUCKET
+    )
     watcher = VRChatLogWatcher(influx)
 
     try:
